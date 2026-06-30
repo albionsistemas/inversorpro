@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InversorPro — Perfil</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f172a; font-family: 'Inter', sans-serif; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: .75rem; }
+    .input-field {
+      width: 100%; background: #0f172a; border: 1px solid #334155;
+      border-radius: .5rem; padding: .65rem 1rem; color: white;
+      font-size: .9rem; outline: none; transition: border-color .2s;
+    }
+    .input-field:focus { border-color: #3b82f6; }
+    .input-field:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary {
+      background: #2563eb; color: white; font-weight: 600;
+      padding: .65rem 1.5rem; border-radius: .5rem; border: none;
+      cursor: pointer; font-size: .9rem; transition: background .2s;
+    }
+    .btn-primary:hover    { background: #1d4ed8; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Barra de fuerza */
+    .strength-bar { height: 4px; border-radius: 2px; transition: width .3s, background .3s; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 99;
+      padding: .75rem 1.25rem; border-radius: .6rem; font-size: .875rem;
+      font-weight: 500; opacity: 0; transform: translateY(8px);
+      transition: opacity .25s, transform .25s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { background: #166534; border: 1px solid #22c55e40; color: #86efac; }
+    #toast.error   { background: #7f1d1d; border: 1px solid #ef444440; color: #fca5a5; }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-lg sticky top-0 z-10">
+    <div class="max-w-screen-md mx-auto px-4 h-14 flex items-center gap-4">
+      <a href="/" class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Volver al dashboard
+      </a>
+      <div class="flex items-center gap-2 ml-auto">
+        <div class="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-xs">IP</div>
+        <span class="font-semibold text-white text-sm">InversorPro</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-screen-md mx-auto px-4 py-8 space-y-6">
+
+    <!-- Header -->
+    <div>
+      <h1 class="text-2xl font-bold text-white">Perfil</h1>
+      <p class="text-slate-400 text-sm mt-1">Administrá tu cuenta y seguridad</p>
+    </div>
+
+    <!-- Info de la cuenta -->
+    <div class="card p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        Información de la cuenta
+      </h2>
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-2xl font-bold text-blue-400" id="avatar-initials">—</div>
+        <div>
+          <p class="font-semibold text-white text-lg" id="display-username">Cargando...</p>
+          <p class="text-slate-400 text-sm">Administrador</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cambiar contraseña -->
+    <div class="card p-6">
+      <h2 class="font-semibold text-white mb-1 flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        Cambiar contraseña
+      </h2>
+      <p class="text-slate-500 text-xs mb-5">Usá una contraseña larga y única.</p>
+
+      <form id="form" onsubmit="changePassword(event)" class="space-y-4">
+
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Contraseña actual</label>
+          <div class="relative">
+            <input id="current" type="password" class="input-field pr-10" placeholder="Tu contraseña actual" required autocomplete="current-password"/>
+            <button type="button" onclick="toggle('current')" tabindex="-1" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs select-none">👁</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Nueva contraseña</label>
+          <div class="relative">
+            <input id="newpass" type="password" class="input-field pr-10" placeholder="Mínimo 6 caracteres"
+              oninput="updateStrength()" required autocomplete="new-password"/>
+            <button type="button" onclick="toggle('newpass')" tabindex="-1" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs select-none">👁</button>
+          </div>
+          <!-- Barra de fuerza -->
+          <div class="mt-2">
+            <div class="h-1 bg-slate-700 rounded-full overflow-hidden">
+              <div id="strength-bar" class="strength-bar h-full w-0 bg-red-500"></div>
+            </div>
+            <p id="strength-label" class="text-xs mt-1 text-slate-500"></p>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Confirmar nueva contraseña</label>
+          <div class="relative">
+            <input id="confirm" type="password" class="input-field pr-10" placeholder="Repetí la nueva contraseña"
+              oninput="checkMatch()" required autocomplete="new-password"/>
+            <button type="button" onclick="toggle('confirm')" tabindex="-1" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs select-none">👁</button>
+          </div>
+          <p id="match-label" class="text-xs mt-1"></p>
+        </div>
+
+        <div id="form-error" class="hidden text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5"></div>
+
+        <div class="flex items-center justify-end pt-1">
+          <button type="submit" class="btn-primary" id="submit-btn">Actualizar contraseña</button>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Sesión -->
+    <div class="card p-6">
+      <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/>
+        </svg>
+        Sesión
+      </h2>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-slate-300">Sesión activa en este dispositivo</p>
+          <p class="text-xs text-slate-500 mt-0.5">La sesión expira a las 24 horas del último login</p>
+        </div>
+        <button onclick="logout()" class="px-4 py-2 text-sm font-medium text-red-400 border border-red-500/30 bg-red-500/10 rounded-lg hover:bg-red-500/20 transition-colors">
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+    // Verificar auth y cargar username
+    fetch('/api/auth/check')
+      .then(r => {
+        if (!r.ok) { window.location.replace('/login.html'); return null; }
+        return r.json();
+      })
+      .then(d => {
+        if (!d) return;
+        document.getElementById('display-username').textContent = d.username;
+        document.getElementById('avatar-initials').textContent  = d.username.slice(0, 2).toUpperCase();
+      });
+
+    async function changePassword(e) {
+      e.preventDefault();
+      const currentPassword  = document.getElementById('current').value;
+      const newPassword      = document.getElementById('newpass').value;
+      const confirmPassword  = document.getElementById('confirm').value;
+      const btn              = document.getElementById('submit-btn');
+      const errEl            = document.getElementById('form-error');
+
+      btn.disabled    = true;
+      btn.textContent = 'Guardando...';
+      errEl.classList.add('hidden');
+
+      try {
+        const res  = await fetch('/api/auth/change-password', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          showToast('Contraseña actualizada correctamente', 'success');
+          document.getElementById('form').reset();
+          document.getElementById('strength-bar').style.width = '0';
+          document.getElementById('strength-label').textContent = '';
+          document.getElementById('match-label').textContent   = '';
+        } else {
+          errEl.textContent = data.error || 'Error al actualizar';
+          errEl.classList.remove('hidden');
+        }
+      } catch {
+        errEl.textContent = 'Error de conexión con el servidor';
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Actualizar contraseña';
+      }
+    }
+
+    function updateStrength() {
+      const val   = document.getElementById('newpass').value;
+      const bar   = document.getElementById('strength-bar');
+      const label = document.getElementById('strength-label');
+      let score   = 0;
+      if (val.length >= 6)  score++;
+      if (val.length >= 10) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+
+      const levels = [
+        { pct: '0%',   color: '',          text: '' },
+        { pct: '25%',  color: '#ef4444',   text: 'Muy débil' },
+        { pct: '50%',  color: '#f97316',   text: 'Débil' },
+        { pct: '75%',  color: '#eab308',   text: 'Moderada' },
+        { pct: '90%',  color: '#22c55e',   text: 'Fuerte' },
+        { pct: '100%', color: '#10b981',   text: 'Muy fuerte' },
+      ];
+      const lvl = levels[score] || levels[0];
+      bar.style.width      = lvl.pct;
+      bar.style.background = lvl.color;
+      label.textContent    = lvl.text;
+      label.style.color    = lvl.color || '#6b7280';
+      checkMatch();
+    }
+
+    function checkMatch() {
+      const np = document.getElementById('newpass').value;
+      const cp = document.getElementById('confirm').value;
+      const el = document.getElementById('match-label');
+      if (!cp) { el.textContent = ''; return; }
+      if (np === cp) {
+        el.textContent  = '✓ Las contraseñas coinciden';
+        el.style.color  = '#22c55e';
+      } else {
+        el.textContent  = '✗ No coinciden';
+        el.style.color  = '#ef4444';
+      }
+    }
+
+    function toggle(id) {
+      const el = document.getElementById(id);
+      el.type  = el.type === 'password' ? 'text' : 'password';
+    }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.replace('/login.html');
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className   = `show ${type}`;
+      setTimeout(() => { t.className = type; }, 3500);
+    }
+  </script>
+</body>
+</html>

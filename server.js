@@ -35,9 +35,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- Rutas públicas (sin auth) ---
 app.use('/api/auth', authRoutes);
 
-// Endpoint para verificar si la sesión es válida (usado por login.html)
-app.get('/api/auth/check', requireAuth, (req, res) => res.json({ ok: true, user: req.user.username }));
-
 // --- Rutas protegidas (requieren login) ---
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/portfolio', requireAuth, portfolioRoutes);

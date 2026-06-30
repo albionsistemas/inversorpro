@@ -22,7 +22,8 @@ const EMPTY_DB = {
   portfolio:       [],
   price_history:   [],
   whale_activities:[],
-  _counters: { portfolio: 0, price_history: 0, whale_activities: 0 },
+  _counters:     { portfolio: 0, price_history: 0, whale_activities: 0 },
+  _credentials:  null,
 };
 
 /** Inicializa la base de datos (crea el archivo si no existe) */
@@ -94,6 +95,19 @@ export function dbDelete(table, id) {
   _db[table]   = _db[table].filter(r => r.id !== id);
   if (_db[table].length < before) { persist(); return true; }
   return false;
+}
+
+// ── Credenciales de usuario ────────────────────────────────────────────────────
+
+/** Retorna las credenciales guardadas (null si nunca se cambió la contraseña) */
+export function getCredentials() {
+  return _db._credentials ?? null;
+}
+
+/** Guarda usuario + hash de contraseña bcrypt */
+export function setCredentials(username, passwordHash) {
+  _db._credentials = { username, passwordHash, updatedAt: new Date().toISOString() };
+  persist();
 }
 
 // ── Datos de ejemplo ──────────────────────────────────────────────────────────
