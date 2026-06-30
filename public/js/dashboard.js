@@ -16,6 +16,22 @@ let activeTab       = 'overview';
 let activeSignalFilter = 'all';
 let isLoading       = false;
 
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+
+// Intercepta respuestas 401 y redirige al login
+function handleUnauth(res) {
+  if (res.status === 401) {
+    window.location.replace('/login.html');
+    return true;
+  }
+  return false;
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.replace('/login.html');
+}
+
 // ── Inicialización ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
@@ -28,6 +44,7 @@ async function loadDashboard() {
   try {
     setLoading(true);
     const res  = await fetch('/api/dashboard');
+    if (handleUnauth(res)) return;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     dashboardData = await res.json();
     renderAll(dashboardData);
@@ -44,6 +61,7 @@ async function loadDashboard() {
 async function loadPortfolio() {
   try {
     const res = await fetch('/api/portfolio');
+    if (handleUnauth(res)) return;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     portfolioData = await res.json();
     renderPortfolio(portfolioData);

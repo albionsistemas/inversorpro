@@ -5,12 +5,15 @@
 
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './src/database/db.js';
 import dashboardRoutes from './src/routes/dashboardRoutes.js';
 import portfolioRoutes from './src/routes/portfolioRoutes.js';
 import toolsRoutes     from './src/routes/toolsRoutes.js';
+import authRoutes      from './src/routes/authRoutes.js';
+import { requireAuth } from './src/middleware/auth.js';
 import { initTelegramBot } from './src/services/telegramService.js';
 
 // Necesario para usar __dirname con ES Modules
@@ -24,17 +27,23 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-// Servir archivos estáticos del frontend
+// Servir archivos estáticos del frontend (login.html, etc.)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Rutas de la API ---
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/portfolio', portfolioRoutes);
-app.use('/api/tools',     toolsRoutes);
+// --- Rutas públicas (sin auth) ---
+app.use('/api/auth', authRoutes);
 
-// Ruta de refresco global: agrega todos los servicios en paralelo
-app.get('/api/refresh', async (req, res) => {
+// Endpoint para verificar si la sesión es válida (usado por login.html)
+app.get('/api/auth/check', requireAuth, (req, res) => res.json({ ok: true, user: req.user.username }));
+
+// --- Rutas protegidas (requieren login) ---
+app.use('/api/dashboard', requireAuth, dashboardRoutes);
+app.use('/api/portfolio', requireAuth, portfolioRoutes);
+app.use('/api/tools',     requireAuth, toolsRoutes);
+
+app.get('/api/refresh', requireAuth, async (req, res) => {
   try {
     const { getDashboardData } = await import('./src/controllers/dashboardController.js');
     const data = await getDashboardData();
@@ -45,7 +54,7 @@ app.get('/api/refresh', async (req, res) => {
   }
 });
 
-// Sirve el frontend para cualquier ruta no-API (SPA fallback)
+// SPA fallback — redirige al login si no está autenticado
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

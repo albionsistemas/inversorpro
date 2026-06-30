@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InversorPro — Iniciar Sesión</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0f172a; font-family: 'Inter', sans-serif; }
+    .input-field {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: .5rem;
+      padding: .65rem 1rem;
+      color: white;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .input-field:focus { border-color: #3b82f6; }
+    .btn-login {
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+      padding: .75rem;
+      border-radius: .5rem;
+      border: none;
+      cursor: pointer;
+      font-size: .95rem;
+      transition: background .2s;
+    }
+    .btn-login:hover  { background: #1d4ed8; }
+    .btn-login:active { background: #1e40af; }
+    .shake { animation: shake .35s ease; }
+    @keyframes shake {
+      0%,100%{ transform:translateX(0) }
+      20%    { transform:translateX(-8px) }
+      40%    { transform:translateX( 8px) }
+      60%    { transform:translateX(-5px) }
+      80%    { transform:translateX( 5px) }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex w-16 h-16 rounded-2xl bg-blue-600 items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg shadow-blue-500/20">
+        IP
+      </div>
+      <h1 class="text-2xl font-bold text-white">InversorPro</h1>
+      <p class="text-slate-400 text-sm mt-1">Dashboard financiero personal</p>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-xl" id="card">
+
+      <h2 class="text-lg font-semibold text-white mb-6">Iniciar sesión</h2>
+
+      <form id="form" onsubmit="handleLogin(event)" class="space-y-4">
+
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Usuario</label>
+          <input id="username" type="text" class="input-field" placeholder="admin"
+            autocomplete="username" autocapitalize="none" spellcheck="false" required/>
+        </div>
+
+        <div>
+          <label class="text-xs text-slate-400 block mb-1.5 font-medium">Contraseña</label>
+          <div class="relative">
+            <input id="password" type="password" class="input-field pr-10" placeholder="••••••••"
+              autocomplete="current-password" required/>
+            <button type="button" onclick="togglePass()" tabindex="-1"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-sm select-none">
+              👁
+            </button>
+          </div>
+        </div>
+
+        <div id="error" class="hidden text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5"></div>
+
+        <button type="submit" class="btn-login mt-2" id="btn">
+          <span id="btn-txt">Ingresar</span>
+        </button>
+
+      </form>
+    </div>
+
+    <p class="text-center text-slate-600 text-xs mt-6">
+      InversorPro v1.0 — uso personal
+    </p>
+  </div>
+
+  <script>
+    // Si ya tiene sesión activa, redirigir al dashboard
+    fetch('/api/auth/check')
+      .then(r => { if (r.ok) window.location.replace('/'); })
+      .catch(() => {});
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const btn      = document.getElementById('btn');
+      const btnTxt   = document.getElementById('btn-txt');
+      const errEl    = document.getElementById('error');
+
+      btnTxt.textContent = 'Verificando...';
+      btn.disabled = true;
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ username, password }),
+        });
+
+        if (res.ok) {
+          btnTxt.textContent = '✓ Accediendo...';
+          btn.style.background = '#16a34a';
+          setTimeout(() => window.location.replace('/'), 400);
+        } else {
+          const data = await res.json();
+          errEl.textContent = data.error || 'Credenciales incorrectas';
+          errEl.classList.remove('hidden');
+          document.getElementById('card').classList.add('shake');
+          setTimeout(() => document.getElementById('card').classList.remove('shake'), 400);
+          document.getElementById('password').value = '';
+          document.getElementById('password').focus();
+          btnTxt.textContent = 'Ingresar';
+          btn.disabled = false;
+        }
+      } catch {
+        errEl.textContent = 'Error de conexión con el servidor';
+        errEl.classList.remove('hidden');
+        btnTxt.textContent = 'Ingresar';
+        btn.disabled = false;
+      }
+    }
+
+    function togglePass() {
+      const inp = document.getElementById('password');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+  </script>
+</body>
+</html>
