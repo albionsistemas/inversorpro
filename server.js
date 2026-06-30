@@ -1,0 +1,74 @@
+/**
+ * server.js — Punto de entrada principal de InversorPro
+ * Configura Express, middlewares y monta todas las rutas de la API
+ */
+
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { initDatabase } from './src/database/db.js';
+import dashboardRoutes from './src/routes/dashboardRoutes.js';
+import portfolioRoutes from './src/routes/portfolioRoutes.js';
+import toolsRoutes     from './src/routes/toolsRoutes.js';
+import { initTelegramBot } from './src/services/telegramService.js';
+
+// Necesario para usar __dirname con ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// --- Middlewares globales ---
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Servir archivos estáticos del frontend
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Rutas de la API ---
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/tools',     toolsRoutes);
+
+// Ruta de refresco global: agrega todos los servicios en paralelo
+app.get('/api/refresh', async (req, res) => {
+  try {
+    const { getDashboardData } = await import('./src/controllers/dashboardController.js');
+    const data = await getDashboardData();
+    res.json({ success: true, data, refreshedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('[REFRESH ERROR]', error.message);
+    res.status(500).json({ success: false, error: 'Error al actualizar los datos', detail: error.message });
+  }
+});
+
+// Sirve el frontend para cualquier ruta no-API (SPA fallback)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// --- Arranque del servidor ---
+async function bootstrap() {
+  try {
+    // Inicializar la base de datos SQLite antes de levantar el servidor
+    await initDatabase();
+    console.log('[DB] Base de datos SQLite inicializada correctamente');
+
+    // Iniciar bot de Telegram si hay token configurado
+    initTelegramBot();
+
+    app.listen(PORT, () => {
+      console.log(`\n🚀 InversorPro corriendo en http://localhost:${PORT}`);
+      console.log(`   Entorno: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`   Presiona Ctrl+C para detener\n`);
+    });
+  } catch (error) {
+    console.error('[FATAL] No se pudo iniciar la aplicación:', error);
+    process.exit(1);
+  }
+}
+
+bootstrap();

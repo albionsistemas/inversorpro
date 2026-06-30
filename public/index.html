@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InversorPro — Dashboard de Inversiones</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+            surface: { DEFAULT:'#0f172a', card:'#1e293b', border:'#334155' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'fade-in': 'fadeIn 0.4s ease-out',
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { background: #0f172a; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+    .signal-buy  { background: rgba(34,197,94,0.12);  border-color: rgba(34,197,94,0.4);  color: #86efac; }
+    .signal-hold { background: rgba(234,179,8,0.12);  border-color: rgba(234,179,8,0.4);  color: #fde047; }
+    .signal-sell { background: rgba(239,68,68,0.12);  border-color: rgba(239,68,68,0.4);  color: #fca5a5; }
+    .up   { color: #22c55e; }
+    .down { color: #ef4444; }
+    .skeleton { background: linear-gradient(90deg, #1e293b 25%, #263548 50%, #1e293b 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 0.25rem; }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .tab-active { border-bottom: 2px solid #3b82f6; color: #93c5fd; }
+    .tab-inactive { color: #64748b; border-bottom: 2px solid transparent; }
+    .tab-inactive:hover { color: #94a3b8; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; border: 1px solid; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100">
+
+  <!-- ═══════════════════════ NAVBAR ═══════════════════════ -->
+  <nav class="sticky top-0 z-50 border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-lg">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-sm">IP</div>
+          <div>
+            <span class="font-bold text-white text-lg tracking-tight">InversorPro</span>
+            <span class="hidden sm:inline text-xs text-slate-500 ml-2">Dashboard</span>
+          </div>
+        </div>
+
+        <!-- Tabs de navegación (escritorio) -->
+        <div class="hidden md:flex items-center gap-1 text-sm font-medium">
+          <button onclick="switchTab('overview')"   id="tab-overview"   class="tab-btn px-4 py-2 transition-colors tab-active">Resumen</button>
+          <button onclick="switchTab('crypto')"     id="tab-crypto"     class="tab-btn px-4 py-2 transition-colors tab-inactive">Crypto</button>
+          <button onclick="switchTab('us')"         id="tab-us"         class="tab-btn px-4 py-2 transition-colors tab-inactive">US Stocks</button>
+          <button onclick="switchTab('argentina')"  id="tab-argentina"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Argentina</button>
+          <button onclick="switchTab('whales')"     id="tab-whales"     class="tab-btn px-4 py-2 transition-colors tab-inactive">Ballenas</button>
+          <button onclick="switchTab('arbitrage')"  id="tab-arbitrage"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Arbitraje</button>
+          <button onclick="switchTab('sentiment')"  id="tab-sentiment"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Sentimiento</button>
+          <button onclick="switchTab('backtest')"   id="tab-backtest"   class="tab-btn px-4 py-2 transition-colors tab-inactive">Backtest</button>
+          <button onclick="switchTab('portfolio')"  id="tab-portfolio"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Portfolio</button>
+        </div>
+
+        <!-- Botón actualizar + timestamp -->
+        <div class="flex items-center gap-3">
+          <span class="hidden sm:block text-xs text-slate-500" id="last-updated">—</span>
+          <button id="refresh-btn" onclick="refreshData()"
+            class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg id="refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span id="refresh-label">Actualizar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs móvil -->
+      <div class="flex md:hidden overflow-x-auto gap-1 pb-2 text-xs font-medium">
+        <button onclick="switchTab('overview')"   id="mob-tab-overview"   class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full bg-blue-600/20 text-blue-400">Resumen</button>
+        <button onclick="switchTab('crypto')"     id="mob-tab-crypto"     class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Crypto</button>
+        <button onclick="switchTab('us')"         id="mob-tab-us"         class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">US</button>
+        <button onclick="switchTab('argentina')"  id="mob-tab-argentina"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Argentina</button>
+        <button onclick="switchTab('whales')"     id="mob-tab-whales"     class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Ballenas</button>
+        <button onclick="switchTab('arbitrage')"  id="mob-tab-arbitrage"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Arbitraje</button>
+        <button onclick="switchTab('sentiment')"  id="mob-tab-sentiment"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Sentimiento</button>
+        <button onclick="switchTab('backtest')"   id="mob-tab-backtest"   class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Backtest</button>
+        <button onclick="switchTab('portfolio')"  id="mob-tab-portfolio"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Portfolio</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════ MAIN CONTENT ═══════════════════════ -->
+  <main class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Error banner -->
+    <div id="error-banner" class="hidden p-4 rounded-lg bg-red-900/30 border border-red-700/50 text-red-300 text-sm flex items-center gap-3">
+      <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+      <span id="error-text">Error al cargar los datos</span>
+    </div>
+
+    <!-- ════════ TAB: RESUMEN ════════ -->
+    <div id="panel-overview" class="tab-panel space-y-6 animate-fade-in">
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Fear & Greed</p>
+          <div id="kpi-fear-greed" class="text-3xl font-bold text-white">—</div>
+          <p id="kpi-fear-label" class="text-xs text-slate-400 mt-1">Cargando...</p>
+          <div id="fear-bar" class="mt-2 h-1.5 rounded-full bg-slate-700"><div id="fear-fill" class="h-full rounded-full transition-all duration-700"></div></div>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Dólar MEP</p>
+          <div id="kpi-mep" class="text-3xl font-bold text-white">—</div>
+          <p id="kpi-mep-blue" class="text-xs text-slate-400 mt-1">Blue: cargando...</p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Merval</p>
+          <div id="kpi-merval" class="text-3xl font-bold text-white">—</div>
+          <p id="kpi-merval-change" class="text-xs mt-1">—</p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Señales Activas</p>
+          <div id="kpi-signals" class="text-3xl font-bold text-white">—</div>
+          <p class="text-xs text-slate-400 mt-1" id="kpi-signals-sub">—</p>
+        </div>
+      </div>
+
+      <!-- Top Oportunidades -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Top COMPRAR -->
+        <div class="card p-5">
+          <h3 class="font-semibold text-sm text-slate-300 mb-4 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse-slow"></span>
+            Top Señales COMPRAR
+          </h3>
+          <div id="top-buys" class="space-y-3">
+            <div class="skeleton h-14 w-full"></div>
+            <div class="skeleton h-14 w-full"></div>
+            <div class="skeleton h-14 w-full"></div>
+          </div>
+        </div>
+
+        <!-- Ballenas recientes -->
+        <div class="card p-5">
+          <h3 class="font-semibold text-sm text-slate-300 mb-4 flex items-center gap-2">
+            <span class="text-blue-400">🐋</span>
+            Últimos Movimientos Institucionales
+          </h3>
+          <div id="whale-summary" class="space-y-3">
+            <div class="skeleton h-14 w-full"></div>
+            <div class="skeleton h-14 w-full"></div>
+            <div class="skeleton h-14 w-full"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de señales completa -->
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+          <h3 class="font-semibold text-white">Todas las Señales del Motor</h3>
+          <div class="flex gap-2 text-xs">
+            <button onclick="filterSignals('all')"  id="f-all"  class="sig-filter px-3 py-1 rounded-full bg-slate-700 text-slate-300 font-medium">Todas</button>
+            <button onclick="filterSignals('BUY')"  id="f-BUY"  class="sig-filter px-3 py-1 rounded-full text-slate-400">Comprar</button>
+            <button onclick="filterSignals('SELL')" id="f-SELL" class="sig-filter px-3 py-1 rounded-full text-slate-400">Vender</button>
+            <button onclick="filterSignals('HOLD')" id="f-HOLD" class="sig-filter px-3 py-1 rounded-full text-slate-400">Mantener</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">Activo</th>
+                <th class="px-4 py-3 text-right">Precio</th>
+                <th class="px-4 py-3 text-right">24h</th>
+                <th class="px-4 py-3 text-center">Señal</th>
+                <th class="px-4 py-3 text-center hidden sm:table-cell">Confianza</th>
+                <th class="px-4 py-3 text-center hidden md:table-cell">Score</th>
+                <th class="px-4 py-3 text-left hidden lg:table-cell">Razón</th>
+              </tr>
+            </thead>
+            <tbody id="signals-table" class="divide-y divide-slate-700/50">
+              <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Cargando señales...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: CRYPTO ════════ -->
+    <div id="panel-crypto" class="tab-panel hidden space-y-6 animate-fade-in">
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 class="font-semibold text-white">Mercado Cripto</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Datos vía CoinGecko API</p>
+          </div>
+          <div id="fear-greed-badge" class="card px-4 py-2 text-sm flex items-center gap-3">
+            <span class="text-slate-400 text-xs">Fear & Greed</span>
+            <span id="fg-value-badge" class="font-bold text-2xl text-white">—</span>
+            <span id="fg-label-badge" class="text-xs text-slate-400">—</span>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">#</th>
+                <th class="px-4 py-3 text-left">Moneda</th>
+                <th class="px-4 py-3 text-right">Precio (USD)</th>
+                <th class="px-4 py-3 text-right">1h</th>
+                <th class="px-4 py-3 text-right">24h</th>
+                <th class="px-4 py-3 text-right hidden sm:table-cell">7d</th>
+                <th class="px-4 py-3 text-right hidden md:table-cell">Vol 24h</th>
+                <th class="px-4 py-3 text-right hidden lg:table-cell">Mkt Cap</th>
+              </tr>
+            </thead>
+            <tbody id="crypto-table" class="divide-y divide-slate-700/50">
+              <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: US STOCKS ════════ -->
+    <div id="panel-us" class="tab-panel hidden space-y-6 animate-fade-in">
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700">
+          <h3 class="font-semibold text-white">Acciones US — Watchlist</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Datos vía Yahoo Finance API</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">Ticker</th>
+                <th class="px-4 py-3 text-left hidden sm:table-cell">Empresa</th>
+                <th class="px-4 py-3 text-right">Precio</th>
+                <th class="px-4 py-3 text-right">Cambio 24h</th>
+                <th class="px-4 py-3 text-right hidden md:table-cell">P/E</th>
+                <th class="px-4 py-3 text-right hidden md:table-cell">Mkt Cap</th>
+                <th class="px-4 py-3 text-right hidden lg:table-cell">52w High</th>
+                <th class="px-4 py-3 text-right hidden lg:table-cell">52w Low</th>
+              </tr>
+            </thead>
+            <tbody id="us-table" class="divide-y divide-slate-700/50">
+              <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: ARGENTINA ════════ -->
+    <div id="panel-argentina" class="tab-panel hidden space-y-6 animate-fade-in">
+
+      <!-- Cotizaciones dólar -->
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-4">Cotizaciones del Dólar</h3>
+        <div id="dollar-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+        </div>
+      </div>
+
+      <!-- Acciones Merval + CEDEARs -->
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="card overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Panel General — Merval</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Precios en ARS</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">Ticker</th>
+                <th class="px-4 py-3 text-right">ARS</th>
+                <th class="px-4 py-3 text-right">USD MEP</th>
+                <th class="px-4 py-3 text-right">24h</th>
+              </tr></thead>
+              <tbody id="merval-table" class="divide-y divide-slate-700/50">
+                <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-700">
+            <h3 class="font-semibold text-white">CEDEARs más operados</h3>
+            <p class="text-xs text-slate-400 mt-0.5">ADRs en pesos | ratio de conversión aplicado</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">CEDEAR</th>
+                <th class="px-4 py-3 text-right">ARS</th>
+                <th class="px-4 py-3 text-right">USD MEP</th>
+                <th class="px-4 py-3 text-right">24h</th>
+              </tr></thead>
+              <tbody id="cedears-table" class="divide-y divide-slate-700/50">
+                <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: BALLENAS ════════ -->
+    <div id="panel-whales" class="tab-panel hidden space-y-6 animate-fade-in">
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="font-semibold text-white">Superinversores — Últimos Movimientos</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Basado en 13F filings SEC y posiciones públicas declaradas</p>
+          </div>
+          <span class="badge bg-amber-500/10 border-amber-500/30 text-amber-300 text-xs">DEMO DATA</span>
+        </div>
+        <div id="institutional-list" class="space-y-3">
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="font-semibold text-white">Ballenas Cripto — Transacciones Grandes</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Movimientos on-chain detectados (Whale Alert)</p>
+          </div>
+          <span class="badge bg-amber-500/10 border-amber-500/30 text-amber-300 text-xs">DEMO DATA</span>
+        </div>
+        <div id="crypto-whales-list" class="space-y-3">
+          <div class="skeleton h-16 rounded-lg"></div>
+          <div class="skeleton h-16 rounded-lg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: PORTFOLIO ════════ -->
+    <div id="panel-portfolio" class="tab-panel hidden space-y-6 animate-fade-in">
+
+      <!-- Resumen portfolio -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Invertido</p>
+          <div id="p-invested" class="text-2xl font-bold text-white">—</div>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Valor Actual</p>
+          <div id="p-value" class="text-2xl font-bold text-white">—</div>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">P&L Total</p>
+          <div id="p-pnl" class="text-2xl font-bold">—</div>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">P&L %</p>
+          <div id="p-pnl-pct" class="text-2xl font-bold">—</div>
+        </div>
+      </div>
+
+      <!-- Tabla de posiciones -->
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+          <h3 class="font-semibold text-white">Mis Posiciones</h3>
+          <button onclick="openAddModal()" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors">+ Agregar</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">Activo</th>
+                <th class="px-4 py-3 text-right">Cantidad</th>
+                <th class="px-4 py-3 text-right">Precio Prom.</th>
+                <th class="px-4 py-3 text-right hidden sm:table-cell">Precio Act.</th>
+                <th class="px-4 py-3 text-right">P&L</th>
+                <th class="px-4 py-3 text-right hidden md:table-cell">P&L %</th>
+                <th class="px-4 py-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-table" class="divide-y divide-slate-700/50">
+              <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Cargando portfolio...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: ARBITRAJE ════════ -->
+    <div id="panel-arbitrage" class="tab-panel hidden space-y-6 animate-fade-in">
+
+      <!-- Info banner -->
+      <div class="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm flex items-start gap-3">
+        <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Comparación de precios en tiempo real entre exchanges argentinos vía <strong>Criptoya API</strong>. La ganancia neta ya descuenta comisiones estimadas de 0.5% por lado.</span>
+      </div>
+
+      <!-- Arbitraje Crypto -->
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 class="font-semibold text-white">Arbitraje Cripto entre Exchanges AR</h3>
+            <p class="text-xs text-slate-400 mt-0.5">USDT · BTC · ETH | Comprá en el exchange más barato, vendé en el más caro</p>
+          </div>
+          <button onclick="loadArbitrage()" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors">↻ Actualizar</button>
+        </div>
+        <div id="arbitrage-crypto-list" class="p-5 space-y-3">
+          <div class="skeleton h-20 rounded-xl"></div>
+          <div class="skeleton h-20 rounded-xl"></div>
+          <div class="skeleton h-20 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- Arbitraje MEP -->
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700">
+          <h3 class="font-semibold text-white">Oportunidades Dólar MEP</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Diferencias entre proveedores de dólar MEP / CCL</p>
+        </div>
+        <div id="arbitrage-mep-list" class="p-5 space-y-3">
+          <div class="skeleton h-16 rounded-xl"></div>
+          <div class="skeleton h-16 rounded-xl"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: SENTIMIENTO ════════ -->
+    <div id="panel-sentiment" class="tab-panel hidden space-y-6 animate-fade-in">
+
+      <!-- Resumen general -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="card p-5 text-center">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Sentimiento General Cripto</p>
+          <div id="sent-overall-score" class="text-4xl font-bold mb-1">—</div>
+          <div id="sent-overall-label" class="text-sm text-slate-400">Cargando...</div>
+          <div id="sent-overall-posts" class="text-xs text-slate-500 mt-1"></div>
+        </div>
+        <div class="card p-5 text-center">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Tendencias</p>
+          <div id="sent-trending" class="flex flex-wrap justify-center gap-2 mt-2"></div>
+        </div>
+        <div class="card p-5 text-center">
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Último análisis</p>
+          <div id="sent-timestamp" class="text-sm text-slate-300">—</div>
+          <button onclick="loadSentiment()" class="mt-3 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/30 rounded-lg text-xs font-semibold transition-colors">↻ Refrescar</button>
+        </div>
+      </div>
+
+      <!-- Por subreddit -->
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-4">Sentimiento por Comunidad (Reddit)</h3>
+        <div id="sent-subreddits" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="skeleton h-20 rounded-xl"></div>
+          <div class="skeleton h-20 rounded-xl"></div>
+          <div class="skeleton h-20 rounded-xl"></div>
+          <div class="skeleton h-20 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- Por activo -->
+      <div class="card overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-700">
+          <h3 class="font-semibold text-white">Sentimiento por Activo</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Basado en menciones y polaridad en Reddit</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+              <th class="px-4 py-3 text-left">Activo</th>
+              <th class="px-4 py-3 text-center">Menciones</th>
+              <th class="px-4 py-3 text-center">Score</th>
+              <th class="px-4 py-3 text-center">Sentimiento</th>
+            </tr></thead>
+            <tbody id="sent-assets-table" class="divide-y divide-slate-700/50">
+              <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">Cargando análisis...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: BACKTEST ════════ -->
+    <div id="panel-backtest" class="tab-panel hidden space-y-6 animate-fade-in">
+
+      <!-- Configuración -->
+      <div class="card p-5">
+        <h3 class="font-semibold text-white mb-4">Configurar Simulación</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Activo</label>
+            <select id="bt-asset" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+              <option value="BTC|Bitcoin|crypto|67450|2.1">BTC — Bitcoin</option>
+              <option value="ETH|Ethereum|crypto|3520|1.8">ETH — Ethereum</option>
+              <option value="SOL|Solana|crypto|178|4.5">SOL — Solana</option>
+              <option value="AAPL|Apple Inc.|us_stock|213.5|0.8">AAPL — Apple</option>
+              <option value="NVDA|NVIDIA Corp.|us_stock|1208.9|3.4">NVDA — NVIDIA</option>
+              <option value="MSFT|Microsoft|us_stock|447.8|1.2">MSFT — Microsoft</option>
+              <option value="GGAL|Grupo Galicia|argentina|7480|2.3">GGAL — Grupo Galicia</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Período (días)</label>
+            <select id="bt-days" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+              <option value="30">30 días</option>
+              <option value="90" selected>90 días</option>
+              <option value="180">180 días</option>
+              <option value="365">1 año</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Capital inicial (USD)</label>
+            <input id="bt-capital" type="number" value="10000" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+          </div>
+          <div class="flex items-end">
+            <button onclick="runBacktest()" id="bt-btn" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+              <span id="bt-btn-label">▶ Simular</span>
+            </button>
+          </div>
+        </div>
+        <p class="text-xs text-amber-400/70 mt-3">⚠ Simulación con datos sintéticos (GBM). No representa rendimientos reales. Solo para calibrar parámetros del motor.</p>
+      </div>
+
+      <!-- Resultados -->
+      <div id="bt-results" class="hidden space-y-6">
+        <!-- KPIs del backtest -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Retorno Estrategia</p>
+            <div id="bt-return" class="text-2xl font-bold">—</div>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Buy & Hold</p>
+            <div id="bt-bh" class="text-2xl font-bold text-slate-300">—</div>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Máx. Drawdown</p>
+            <div id="bt-dd" class="text-2xl font-bold text-red-400">—</div>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Sharpe Ratio</p>
+            <div id="bt-sharpe" class="text-2xl font-bold">—</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Win Rate</p>
+            <div id="bt-winrate" class="text-xl font-bold text-green-400">—</div>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Total Operaciones</p>
+            <div id="bt-trades" class="text-xl font-bold text-white">—</div>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-xs text-slate-400 mb-1">Alpha vs B&H</p>
+            <div id="bt-alpha" class="text-xl font-bold">—</div>
+          </div>
+        </div>
+
+        <!-- Tabla de operaciones -->
+        <div class="card overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-700">
+            <h3 class="font-semibold text-white">Historial de Operaciones Simuladas</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 uppercase tracking-wider bg-slate-800/50">
+                <th class="px-4 py-3 text-left">Día</th>
+                <th class="px-4 py-3 text-center">Acción</th>
+                <th class="px-4 py-3 text-right">Precio</th>
+                <th class="px-4 py-3 text-right">Capital</th>
+              </tr></thead>
+              <tbody id="bt-trades-table" class="divide-y divide-slate-700/50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estado vacío inicial -->
+      <div id="bt-empty" class="card p-16 text-center text-slate-500">
+        <div class="text-4xl mb-3">📊</div>
+        <p class="font-medium">Configurá los parámetros y presioná <strong>Simular</strong></p>
+        <p class="text-xs mt-1">El motor correrá la estrategia SMA sobre datos históricos sintéticos</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal agregar posición -->
+  <div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="card w-full max-w-md p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-white">Agregar Posición</h3>
+        <button onclick="closeAddModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Símbolo *</label>
+          <input id="f-symbol" type="text" placeholder="BTC, AAPL, GGAL..." class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Tipo *</label>
+          <select id="f-type" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+            <option value="crypto">Criptomoneda</option>
+            <option value="us_stock">Acción US</option>
+            <option value="argentina">Argentina (Merval/CEDEAR)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Nombre *</label>
+          <input id="f-name" type="text" placeholder="Bitcoin, Apple Inc..." class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Cantidad *</label>
+            <input id="f-amount" type="number" step="any" placeholder="0.5" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Precio Promedio *</label>
+            <input id="f-avgprice" type="number" step="any" placeholder="50000" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" />
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Moneda</label>
+          <select id="f-currency" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+            <option value="USD">USD</option>
+            <option value="ARS">ARS</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button onclick="closeAddModal()" class="flex-1 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm hover:bg-slate-700 transition-colors">Cancelar</button>
+        <button onclick="submitAddPosition()" class="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

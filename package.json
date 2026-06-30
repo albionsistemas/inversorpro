@@ -1,0 +1,22 @@
+{
+  "name": "inversorpro-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard modular de inversiones: Crypto, US Stocks, Argentina (Merval) y seguimiento de ballenas institucionales",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "telegraf": "^4.16.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

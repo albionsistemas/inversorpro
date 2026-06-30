@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <title>InversorPro — Backtest Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0f172a; font-family:'Inter',sans-serif; }
+    .card { background:#1e293b; border:1px solid #334155; border-radius:.75rem; }
+    .up   { color:#22c55e; }
+    .down { color:#ef4444; }
+    .badge { display:inline-flex; align-items:center; padding:2px 10px; border-radius:9999px;
+             font-size:.7rem; font-weight:700; letter-spacing:.05em; border:1px solid; }
+    .buy  { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.4); color:#86efac; }
+    .sell { background:rgba(239,68,68,.12);  border-color:rgba(239,68,68,.4); color:#fca5a5; }
+  </style>
+</head>
+<body class="text-slate-100 p-6 min-h-screen">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-8">
+    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-sm">IP</div>
+    <div>
+      <span class="font-bold text-white text-xl">InversorPro</span>
+      <span class="text-slate-400 text-sm ml-2">— Simulador de Backtesting</span>
+    </div>
+    <span class="ml-auto text-xs text-amber-400 border border-amber-500/30 bg-amber-500/10 px-3 py-1 rounded-full">
+      ⚠ Datos Sintéticos (GBM) — No representa rendimientos reales
+    </span>
+  </div>
+
+  <!-- Controles -->
+  <div class="card p-5 mb-6">
+    <h3 class="font-semibold text-white mb-4">Configuración de la Simulación</h3>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Activo</label>
+        <select id="sel-asset" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="BTC|Bitcoin|crypto|67450|2.1">BTC — Bitcoin</option>
+          <option value="ETH|Ethereum|crypto|3520|1.8">ETH — Ethereum</option>
+          <option value="SOL|Solana|crypto|178|4.5">SOL — Solana</option>
+          <option value="AAPL|Apple|us_stock|213.5|0.8">AAPL — Apple</option>
+          <option value="NVDA|NVIDIA|us_stock|1208.9|3.4">NVDA — NVIDIA</option>
+          <option value="GGAL|Grupo Galicia|argentina|7480|2.3">GGAL — Grupo Galicia</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Período</label>
+        <select id="sel-days" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="30">30 días</option>
+          <option value="90" selected>90 días</option>
+          <option value="180">180 días</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Capital Inicial (USD)</label>
+        <input id="sel-capital" type="number" value="10000"
+          class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"/>
+      </div>
+      <div class="flex items-end">
+        <button onclick="ejecutar()" id="btn"
+          class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-lg transition-colors flex items-center justify-center gap-2">
+          <span id="btn-txt">▶ Simular</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resultados -->
+  <div id="results" class="hidden space-y-6">
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card p-5 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Retorno Estrategia</p>
+        <div id="r-return" class="text-3xl font-bold"></div>
+      </div>
+      <div class="card p-5 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Buy &amp; Hold</p>
+        <div id="r-bh" class="text-3xl font-bold text-slate-300"></div>
+      </div>
+      <div class="card p-5 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Máx. Drawdown</p>
+        <div id="r-dd" class="text-3xl font-bold text-red-400"></div>
+      </div>
+      <div class="card p-5 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-1">Sharpe Ratio</p>
+        <div id="r-sharpe" class="text-3xl font-bold"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div class="card p-4 text-center">
+        <p class="text-xs text-slate-400 mb-1">Win Rate</p>
+        <div id="r-wr" class="text-2xl font-bold text-green-400"></div>
+      </div>
+      <div class="card p-4 text-center">
+        <p class="text-xs text-slate-400 mb-1">Operaciones</p>
+        <div id="r-trades" class="text-2xl font-bold text-white"></div>
+      </div>
+      <div class="card p-4 text-center">
+        <p class="text-xs text-slate-400 mb-1">Alpha vs B&amp;H</p>
+        <div id="r-alpha" class="text-2xl font-bold"></div>
+      </div>
+    </div>
+
+    <!-- Curva de equity (barras simples) -->
+    <div class="card p-5">
+      <h3 class="font-semibold text-white mb-4">Curva de Equity de la Estrategia</h3>
+      <div id="equity-chart" class="flex items-end gap-1 h-32"></div>
+      <div class="flex justify-between text-xs text-slate-500 mt-1">
+        <span>Día 0</span><span id="ec-mid"></span><span id="ec-end"></span>
+      </div>
+    </div>
+
+    <!-- Tabla de operaciones -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-700">
+        <h3 class="font-semibold text-white">Historial de Operaciones Simuladas</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-xs text-slate-400 uppercase bg-slate-800/50">
+            <th class="px-4 py-3 text-left">Día</th>
+            <th class="px-4 py-3 text-center">Acción</th>
+            <th class="px-4 py-3 text-right">Precio</th>
+            <th class="px-4 py-3 text-right">Capital</th>
+          </tr></thead>
+          <tbody id="trades-tbody" class="divide-y divide-slate-700/50"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Estado vacío -->
+  <div id="empty" class="card p-20 text-center text-slate-500 mt-6">
+    <div class="text-5xl mb-4">📊</div>
+    <p class="text-lg font-medium text-slate-300">Simulador listo</p>
+    <p class="text-sm mt-2">Elegí un activo y período, luego presioná <strong class="text-white">Simular</strong></p>
+  </div>
+
+  <script>
+    async function ejecutar() {
+      const raw     = document.getElementById('sel-asset').value;
+      const [symbol, name, type, price, ch24h] = raw.split('|');
+      const days    = +document.getElementById('sel-days').value;
+      const capital = +document.getElementById('sel-capital').value;
+
+      const btn = document.getElementById('btn-txt');
+      btn.textContent = '⏳ Simulando...';
+      document.getElementById('results').classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/tools/backtest', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ symbol, name, type, price: +price, change24h: +ch24h, days, initialCapital: capital }),
+        });
+        const d = await res.json();
+        render(d);
+        document.getElementById('empty').classList.add('hidden');
+        document.getElementById('results').classList.remove('hidden');
+      } catch(e) {
+        alert('Error: ' + e.message);
+      } finally {
+        btn.textContent = '▶ Simular';
+      }
+    }
+
+    function render(d) {
+      const fmt = (n, dec=2) => n != null ? n.toLocaleString('es-AR', {minimumFractionDigits:dec, maximumFractionDigits:dec}) : '—';
+
+      // KPIs
+      set('r-return', `${d.totalReturn >= 0 ? '+' : ''}${fmt(d.totalReturn)}%`, d.totalReturn >= 0 ? 'up' : 'down');
+      set('r-bh',     `${d.buyAndHoldReturn >= 0 ? '+' : ''}${fmt(d.buyAndHoldReturn)}%`);
+      set('r-dd',     `${fmt(d.maxDrawdown)}%`);
+      set('r-sharpe', fmt(d.sharpeRatio), d.sharpeRatio > 1 ? 'up' : d.sharpeRatio < 0 ? 'down' : 'text-yellow-400');
+      set('r-wr',     `${fmt(d.winRate)}%`);
+      set('r-trades', d.totalTrades ?? '—');
+      const alpha = d.strategyVsBuyHold ?? 0;
+      set('r-alpha',  `${alpha >= 0 ? '+' : ''}${fmt(alpha)}%`, alpha >= 0 ? 'up' : 'down');
+
+      // Curva de equity
+      const curve  = d.equityCurve ?? [];
+      const min    = Math.min(...curve.map(p => p.value));
+      const max    = Math.max(...curve.map(p => p.value));
+      const range  = max - min || 1;
+      const chart  = document.getElementById('equity-chart');
+      chart.innerHTML = curve.map(p => {
+        const h     = Math.max(4, Math.round(((p.value - min) / range) * 112));
+        const color = p.signal === 'BUY' ? '#22c55e' : p.signal === 'SELL' ? '#ef4444' : '#3b82f6';
+        return `<div title="Día ${p.day}: $${p.value.toLocaleString('es-AR')}" style="flex:1;height:${h}px;background:${color};border-radius:2px;min-width:4px;opacity:.85"></div>`;
+      }).join('');
+      if (curve.length) {
+        const mid = curve[Math.floor(curve.length/2)];
+        document.getElementById('ec-mid').textContent = `Día ${mid.day}`;
+        document.getElementById('ec-end').textContent = `Día ${curve[curve.length-1].day}`;
+      }
+
+      // Operaciones
+      const tbody = document.getElementById('trades-tbody');
+      if (!d.trades?.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-500 text-sm">Sin operaciones en este período</td></tr>';
+      } else {
+        tbody.innerHTML = d.trades.map(t => `
+          <tr class="hover:bg-slate-700/30">
+            <td class="px-4 py-3 text-slate-400">Día ${t.day}</td>
+            <td class="px-4 py-3 text-center"><span class="badge ${t.action==='BUY'?'buy':'sell'}">${t.action==='BUY'?'COMPRA':'VENTA'}</span></td>
+            <td class="px-4 py-3 text-right font-mono text-slate-200">$${fmt(t.price)}</td>
+            <td class="px-4 py-3 text-right font-semibold text-white">$${fmt(t.capital)}</td>
+          </tr>`).join('');
+      }
+    }
+
+    function set(id, text, cls) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      if (cls) el.className = el.className.replace(/\b(up|down|text-\w+-\d+)\b/g, '') + ' ' + cls;
+    }
+
+    // Auto-ejecutar al cargar la página
+    window.addEventListener('load', ejecutar);
+  </script>
+</body>
+</html>
