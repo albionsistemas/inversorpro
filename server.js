@@ -13,7 +13,7 @@ import dashboardRoutes from './src/routes/dashboardRoutes.js';
 import portfolioRoutes from './src/routes/portfolioRoutes.js';
 import toolsRoutes     from './src/routes/toolsRoutes.js';
 import authRoutes      from './src/routes/authRoutes.js';
-import { requireAuth } from './src/middleware/auth.js';
+import { requireAuth, warnIfInsecureProductionConfig } from './src/middleware/auth.js';
 import { initTelegramBot } from './src/services/telegramService.js';
 
 // Necesario para usar __dirname con ES Modules
@@ -59,12 +59,15 @@ app.get('*', (req, res) => {
 // --- Arranque del servidor ---
 async function bootstrap() {
   try {
-    // Inicializar la base de datos SQLite antes de levantar el servidor
+    // Inicializar la base de datos (JSON store) antes de levantar el servidor
     await initDatabase();
-    console.log('[DB] Base de datos SQLite inicializada correctamente');
+    console.log('[DB] Base de datos inicializada correctamente');
 
     // Iniciar bot de Telegram si hay token configurado
     initTelegramBot();
+
+    // Advertir si quedan credenciales por defecto al correr en producción
+    warnIfInsecureProductionConfig();
 
     app.listen(PORT, () => {
       console.log(`\n🚀 InversorPro corriendo en http://localhost:${PORT}`);

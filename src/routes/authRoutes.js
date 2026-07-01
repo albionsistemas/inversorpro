@@ -6,13 +6,14 @@ import { Router }                       from 'express';
 import bcrypt                           from 'bcryptjs';
 import { signToken }                    from '../middleware/auth.js';
 import { requireAuth }                  from '../middleware/auth.js';
+import { loginLimiter, changePasswordLimiter } from '../middleware/rateLimit.js';
 import { getCredentials, setCredentials } from '../database/db.js';
 
 const router = Router();
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Faltan campos requeridos' });
 
@@ -35,6 +36,7 @@ router.post('/login', async (req, res) => {
     httpOnly: true,
     maxAge:   24 * 60 * 60 * 1000,
     sameSite: 'strict',
+    secure:   process.env.NODE_ENV === 'production',
   });
   res.json({ ok: true });
 });
@@ -54,7 +56,7 @@ router.get('/check', requireAuth, (req, res) => {
 
 // ── Cambiar contraseña ────────────────────────────────────────────────────────
 
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, changePasswordLimiter, async (req, res) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
   if (!currentPassword || !newPassword || !confirmPassword) {
