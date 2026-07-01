@@ -1,7 +1,7 @@
 /**
  * usStocksService.js — Cotizaciones de acciones internacionales (mercado US)
  *
- * Fuente primaria: Yahoo Finance API no oficial (gratuita, sin key)
+ * Fuente primaria: Yahoo Finance chart API v8 (no oficial, gratuita, sin key)
  * Fuente de respaldo: datos mock con precios realistas
  *
  * Lista de seguimiento: blue chips, tech y las posiciones de superinversores
@@ -9,13 +9,53 @@
 
 import axios from 'axios';
 
-const YAHOO_QUOTE_URL = 'https://query1.finance.yahoo.com/v7/finance/quote';
+const YAHOO_CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const CACHE_TTL_MS    = (parseInt(process.env.CACHE_TTL_MINUTES) || 5) * 60 * 1000;
 
 let cache = { stocks: null };
 
 /** Watchlist de acciones US a monitorear */
 const WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'GOOGL', 'AMZN', 'META', 'BRK-B', 'JPM', 'V'];
+
+/** Consulta la cotización de un símbolo vía el endpoint de chart (v7/quote quedó deprecado, devuelve 401) */
+async function fetchYahooChart(symbol) {
+  try {
+    const response = await axios.get(`${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}`, {
+      params: { interval: '1d', range: '1d' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; InversorPro/1.0)',
+        'Accept':     'application/json',
+      },
+      timeout: 8000,
+    });
+
+    const meta = response.data?.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) return null;
+
+    const price    = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose ?? price;
+    const changeAbs = price - prevClose;
+
+    return {
+      symbol,
+      name:         meta.longName || meta.shortName || symbol,
+      price,
+      change24h:    prevClose ? (changeAbs / prevClose) * 100 : 0,
+      changeAbs,
+      volume24h:    meta.regularMarketVolume ?? 0,
+      marketCap:    null, // no disponible en el endpoint de chart
+      peRatio:      null, // no disponible en el endpoint de chart
+      high52w:      meta.fiftyTwoWeekHigh ?? 0,
+      low52w:       meta.fiftyTwoWeekLow ?? 0,
+      currency:     meta.currency ?? 'USD',
+      marketState:  'CLOSED',
+      type:         'us_stock',
+    };
+  } catch (error) {
+    console.warn(`[USStocksService] ${symbol}: ${error.message}`);
+    return null;
+  }
+}
 
 /**
  * Retorna cotizaciones actualizadas para el watchlist de acciones US.
@@ -26,43 +66,16 @@ export async function getUSStockPrices() {
     return cache.stocks.data;
   }
 
-  try {
-    const response = await axios.get(YAHOO_QUOTE_URL, {
-      params: { symbols: WATCHLIST.join(','), lang: 'en-US', region: 'US' },
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; InversorPro/1.0)',
-        'Accept':     'application/json',
-      },
-      timeout: 8000,
-    });
+  const results = await Promise.all(WATCHLIST.map(fetchYahooChart));
+  const stocks  = results.filter(Boolean);
 
-    const quotes = response.data?.quoteResponse?.result ?? [];
-
-    if (quotes.length === 0) throw new Error('Respuesta vacía de Yahoo Finance');
-
-    const stocks = quotes.map(q => ({
-      symbol:       q.symbol,
-      name:         q.shortName || q.longName || q.symbol,
-      price:        q.regularMarketPrice ?? 0,
-      change24h:    q.regularMarketChangePercent ?? 0,
-      changeAbs:    q.regularMarketChange ?? 0,
-      volume24h:    q.regularMarketVolume ?? 0,
-      marketCap:    q.marketCap ?? 0,
-      peRatio:      q.trailingPE ?? null,
-      high52w:      q.fiftyTwoWeekHigh ?? 0,
-      low52w:       q.fiftyTwoWeekLow ?? 0,
-      currency:     q.currency ?? 'USD',
-      marketState:  q.marketState ?? 'CLOSED',
-      type:         'us_stock',
-    }));
-
-    cache.stocks = { data: stocks, timestamp: Date.now() };
-    return stocks;
-
-  } catch (error) {
-    console.warn('[USStocksService] Error al consultar Yahoo Finance, usando mock:', error.message);
+  if (stocks.length === 0) {
+    console.warn('[USStocksService] Sin datos de Yahoo Finance, usando mock');
     return getMockUSStocks();
   }
+
+  cache.stocks = { data: stocks, timestamp: Date.now() };
+  return stocks;
 }
 
 /** Mock con datos realistas para las principales acciones del mercado US */
