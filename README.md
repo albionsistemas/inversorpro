@@ -54,8 +54,8 @@ FEAR_GREED_ALERT_HIGH=80
 | CoinGecko | ✅ Live | Precios crypto, Fear & Greed |
 | dolarapi.com | ✅ Live | MEP, CCL, Blue, Oficial |
 | Criptoya | ✅ Live | Arbitraje entre exchanges ARS |
-| Yahoo Finance | ⚠ Mock | API unofficial deprecada |
-| Reddit JSON | ⚠ Mock | Bloqueado sin OAuth desde 2023 |
+| Yahoo Finance | ✅ Live | Endpoint de chart (v8), sin API key |
+| Reddit | ✅ Live | OAuth2, requiere REDDIT_CLIENT_ID/SECRET en .env |
 | Telegram | ✅ Opcional | Requiere token en .env |
 
 ## Estructura del proyecto

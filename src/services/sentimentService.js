@@ -1,9 +1,10 @@
 /**
  * sentimentService.js — Análisis de sentimiento de mercado
  *
- * Fuentes de datos (sin API keys):
- *   - Reddit JSON API pública (r/CryptoCurrency, r/wallstreetbets, r/merval, r/bitcoin)
- *   - CryptoPanic API pública (noticias cripto con votos)
+ * Fuente de datos: Reddit API oficial vía OAuth2 (client_credentials)
+ *   Subreddits: r/CryptoCurrency, r/wallstreetbets, r/merval, r/bitcoin
+ *   Requiere REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET en .env (app tipo "script",
+ *   gratis en reddit.com/prefs/apps). Sin credenciales, cae a datos mock.
  *
  * Algoritmo:
  *   1. Tokenizar título + cuerpo del post
@@ -15,17 +16,47 @@
  */
 
 import axios from 'axios';
+import { reportStatus } from './statusTracker.js';
 
-const CACHE_TTL_MS    = 10 * 60 * 1000;
-const REDDIT_UA       = 'InversorPro/1.0 (dashboard financiero; github.com/inversorpro)';
-const CRYPTOPANIC_URL = 'https://cryptopanic.com/api/v1/posts/?public=true&filter=hot';
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const REDDIT_UA    = 'InversorPro/1.0 (dashboard financiero; github.com/inversorpro)';
 
-const SUBREDDIT_URLS = [
-  { subreddit: 'CryptoCurrency', url: 'https://www.reddit.com/r/CryptoCurrency/hot.json?limit=25' },
-  { subreddit: 'wallstreetbets', url: 'https://www.reddit.com/r/wallstreetbets/hot.json?limit=25' },
-  { subreddit: 'merval',         url: 'https://www.reddit.com/r/merval/hot.json?limit=25' },
-  { subreddit: 'bitcoin',        url: 'https://www.reddit.com/r/bitcoin/hot.json?limit=25' },
-];
+const SUBREDDITS = ['CryptoCurrency', 'wallstreetbets', 'merval', 'bitcoin'];
+
+// Caché del token de acceso OAuth2 de Reddit
+let tokenCache = { accessToken: null, expiresAt: 0 };
+
+/** Obtiene (y cachea) un access token de Reddit vía client_credentials. Null si no está configurado. */
+async function getRedditAccessToken() {
+  if (tokenCache.accessToken && Date.now() < tokenCache.expiresAt) {
+    return tokenCache.accessToken;
+  }
+
+  const clientId     = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+
+  try {
+    const r = await axios.post(
+      'https://www.reddit.com/api/v1/access_token',
+      'grant_type=client_credentials',
+      {
+        auth:    { username: clientId, password: clientSecret },
+        headers: { 'User-Agent': REDDIT_UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 8000,
+      }
+    );
+
+    tokenCache = {
+      accessToken: r.data.access_token,
+      expiresAt:   Date.now() + (r.data.expires_in - 60) * 1000,
+    };
+    return tokenCache.accessToken;
+  } catch (e) {
+    console.warn('[SentimentService] Error al autenticar con Reddit:', e.message);
+    return null;
+  }
+}
 
 // Vocabulario de sentimiento (ES + EN)
 const POSITIVE = new Set([
@@ -92,9 +123,16 @@ function extractTickers(text) {
 
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function fetchSubreddit(subreddit, url) {
+async function fetchSubreddit(subreddit) {
+  const token = await getRedditAccessToken();
+  if (!token) return [];
+
   try {
-    const r = await axios.get(url, { headers: { 'User-Agent': REDDIT_UA }, timeout: 8000 });
+    const r = await axios.get(`https://oauth.reddit.com/r/${subreddit}/hot`, {
+      params:  { limit: 25 },
+      headers: { 'User-Agent': REDDIT_UA, 'Authorization': `Bearer ${token}` },
+      timeout: 8000,
+    });
     return (r.data?.data?.children ?? []).map(c => ({
       title:   c.data?.title    ?? '',
       upvotes: c.data?.ups      ?? 0,
@@ -106,26 +144,12 @@ async function fetchSubreddit(subreddit, url) {
   }
 }
 
-async function fetchCryptoPanic() {
-  try {
-    const r = await axios.get(CRYPTOPANIC_URL, { timeout: 8000 });
-    return (r.data?.results ?? []).map(p => ({
-      title:      p.title ?? '',
-      upvotes:    p.votes?.positive ?? 0,
-      currencies: (p.currencies ?? []).map(c => c.code?.toUpperCase()).filter(Boolean),
-    }));
-  } catch (e) {
-    console.warn(`[SentimentService] CryptoPanic: ${e.message}`);
-    return [];
-  }
-}
-
 // ── Procesamiento principal ───────────────────────────────────────────────────
 
 async function fetchAndScore() {
   const results = await Promise.all(
-    SUBREDDIT_URLS.map(({ subreddit, url }) =>
-      fetchSubreddit(subreddit, url).then(posts => ({ subreddit, posts }))
+    SUBREDDITS.map(subreddit =>
+      fetchSubreddit(subreddit).then(posts => ({ subreddit, posts }))
     )
   );
 
@@ -168,9 +192,10 @@ export async function getRedditSentiment() {
   try {
     const result = await fetchAndScore();
 
-    // Si Reddit devuelve 403 o bloquea todos los requests, caer a mock
+    // Sin credenciales configuradas o Reddit sin responder: caer a mock
     if (result.allPosts.length === 0) {
-      console.warn('[SentimentService] Reddit bloqueó todos los requests (403). Usando datos demo.');
+      console.warn('[SentimentService] Sin datos de Reddit (revisar REDDIT_CLIENT_ID/SECRET). Usando datos demo.');
+      reportStatus('reddit', 'Reddit', false, 'Sin REDDIT_CLIENT_ID/SECRET configurados o sin respuesta');
       const m = getMock();
       cache.data      = { ...m, lastUpdated: m.lastUpdated };
       cache.timestamp = Date.now();
@@ -179,9 +204,11 @@ export async function getRedditSentiment() {
 
     cache.data      = { ...cache.data, ...result, lastUpdated: new Date().toISOString() };
     cache.timestamp = Date.now();
+    reportStatus('reddit', 'Reddit', true, 'OAuth2 client_credentials');
     return { overall: result.overall, bySubreddit: result.bySubreddit, lastUpdated: cache.data.lastUpdated };
   } catch (e) {
     console.error('[SentimentService]', e.message);
+    reportStatus('reddit', 'Reddit', false, e.message);
     const m = getMock();
     return { overall: m.overall, bySubreddit: m.bySubreddit, lastUpdated: m.lastUpdated, isMock: true };
   }
@@ -198,16 +225,15 @@ export async function getSentimentByAsset(symbols = []) {
   // Asegurar que el caché esté poblado
   if (!isCacheValid()) await getRedditSentiment();
 
-  const redditPosts  = cache.data?.allPosts ?? [];
-  const cryptoPosts  = await fetchCryptoPanic();
+  const redditPosts = cache.data?.allPosts ?? [];
 
   const map = {};
   syms.forEach(s => { map[s] = { scores: [], mentions: 0 }; });
 
-  const processPost = (title, text, upvotes, taggedSyms = []) => {
+  const processPost = (title, text, upvotes) => {
     const full     = `${title} ${text}`.toUpperCase();
     const score    = weighted(rawScore(`${title} ${text}`), upvotes);
-    const detected = [...new Set([...extractTickers(full), ...taggedSyms])];
+    const detected = extractTickers(full);
     for (const sym of syms) {
       if (full.includes(sym) || detected.includes(sym)) {
         map[sym].mentions++;
@@ -217,7 +243,6 @@ export async function getSentimentByAsset(symbols = []) {
   };
 
   redditPosts.forEach(p => processPost(p.title, p.text, p.upvotes));
-  cryptoPosts.forEach(p => processPost(p.title, '', p.upvotes, p.currencies ?? []));
 
   return syms
     .map(sym => {
