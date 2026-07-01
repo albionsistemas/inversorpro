@@ -4,9 +4,14 @@
  */
 
 import { getCryptoArbitrageOpportunities, getMepArbitrageOpportunities } from '../services/arbitrageService.js';
-import { getSentimentSummary }   from '../services/sentimentService.js';
+import { getSentimentSummary, getRedditSentiment } from '../services/sentimentService.js';
 import { runBacktest as _runBacktest } from '../services/backtestService.js';
 import { getBotStatus }          from '../services/telegramService.js';
+import { getCryptoPrices, getFearGreedIndex } from '../services/cryptoService.js';
+import { getUSStockPrices }      from '../services/usStocksService.js';
+import { getDollarRates, getMervalData } from '../services/argentinaService.js';
+import { getWhaleActivities }    from '../services/whaleTrackerService.js';
+import { getAllStatuses }        from '../services/statusTracker.js';
 
 /** GET /api/tools/arbitrage */
 export async function getArbitrage(req, res) {
@@ -61,5 +66,29 @@ export async function getTelegramStatus(req, res) {
     res.json(getBotStatus());
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener estado del bot', detail: err.message });
+  }
+}
+
+/** GET /api/tools/status — estado (real/mock) de cada fuente de datos */
+export async function getStatus(req, res) {
+  try {
+    await Promise.allSettled([
+      getCryptoPrices(),
+      getFearGreedIndex(),
+      getUSStockPrices(),
+      getDollarRates(),
+      getMervalData(),
+      getCryptoArbitrageOpportunities(),
+      getRedditSentiment(),
+      getWhaleActivities(),
+    ]);
+
+    res.json({
+      sources:   getAllStatuses(),
+      telegram:  getBotStatus(),
+      fetchedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener estado de las fuentes', detail: err.message });
   }
 }

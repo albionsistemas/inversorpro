@@ -8,6 +8,7 @@
  */
 
 import axios from 'axios';
+import { reportStatus } from './statusTracker.js';
 
 const YAHOO_CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const CACHE_TTL_MS    = (parseInt(process.env.CACHE_TTL_MINUTES) || 5) * 60 * 1000;
@@ -71,10 +72,12 @@ export async function getUSStockPrices() {
 
   if (stocks.length === 0) {
     console.warn('[USStocksService] Sin datos de Yahoo Finance, usando mock');
+    reportStatus('yahoo', 'Yahoo Finance', false, 'Sin respuesta del endpoint v8/chart');
     return getMockUSStocks();
   }
 
   cache.stocks = { data: stocks, timestamp: Date.now() };
+  reportStatus('yahoo', 'Yahoo Finance', true, 'vía endpoint v8/chart');
   return stocks;
 }
 

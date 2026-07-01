@@ -7,6 +7,7 @@
  */
 
 import axios from 'axios';
+import { reportStatus } from './statusTracker.js';
 
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const FEAR_GREED_URL = 'https://api.alternative.me/fng/?limit=1';
@@ -61,10 +62,12 @@ export async function getCryptoPrices() {
     }));
 
     cache.coins = { data: coins, timestamp: Date.now() };
+    reportStatus('coingecko', 'CoinGecko', true);
     return coins;
 
   } catch (error) {
     console.warn('[CryptoService] Error al consultar CoinGecko, usando mock:', error.message);
+    reportStatus('coingecko', 'CoinGecko', false, error.message);
     // Si la API falla, retornar datos mock para no romper el dashboard
     return getMockCryptoData();
   }
@@ -91,10 +94,12 @@ export async function getFearGreedIndex() {
     };
 
     cache.fearGreed = { data, timestamp: Date.now() };
+    reportStatus('feargreed', 'Fear & Greed Index', true);
     return data;
 
   } catch (error) {
     console.warn('[CryptoService] Error al obtener Fear & Greed:', error.message);
+    reportStatus('feargreed', 'Fear & Greed Index', false, error.message);
     return { value: 52, label: 'Neutral', updatedAt: new Date().toISOString() };
   }
 }

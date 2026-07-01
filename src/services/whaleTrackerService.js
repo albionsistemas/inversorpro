@@ -16,6 +16,8 @@
  *   - Stanley Druckenmiller
  */
 
+import { reportStatus } from './statusTracker.js';
+
 const CACHE_TTL_MS = (parseInt(process.env.CACHE_TTL_MINUTES) || 5) * 60 * 1000;
 let cache = { activities: null };
 
@@ -39,6 +41,7 @@ export async function getWhaleActivities() {
   };
 
   cache.activities = { data, timestamp: Date.now() };
+  reportStatus('whales', 'Whale Tracker', false, 'Mock permanente — requiere SEC EDGAR / Whale Alert API');
   return data;
 }
 

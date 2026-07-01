@@ -496,6 +496,7 @@ function switchTab(tab) {
   if (tab === 'portfolio')  loadPortfolio();
   if (tab === 'arbitrage')  loadArbitrage();
   if (tab === 'sentiment')  loadSentiment();
+  if (tab === 'status')     loadStatus();
 }
 
 // ── Helpers UI ─────────────────────────────────────────────────────────────────
@@ -835,4 +836,53 @@ function renderBacktestResults(d) {
   } else if (tbody) {
     tbody.innerHTML = noDataRow(4, 'Sin operaciones en este período');
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: ESTADO DE FUENTES DE DATOS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let statusLoaded = false;
+
+async function loadStatus() {
+  if (statusLoaded) return; // ya cargado en esta sesión
+  try {
+    const res  = await fetch('/api/tools/status');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderStatus(data);
+    statusLoaded = true;
+  } catch (err) {
+    document.getElementById('status-sources').innerHTML =
+      `<p class="text-red-400 text-sm p-4 col-span-full">Error al cargar: ${err.message}</p>`;
+    console.error('[Status]', err);
+  }
+}
+
+function renderStatus(data) {
+  const sources = [...(data.sources ?? [])];
+  const tg       = data.telegram ?? {};
+  sources.push({
+    key:         'telegram',
+    label:       'Telegram',
+    isLive:      Boolean(tg.active),
+    detail:      tg.active ? `Bot @${tg.botUsername} — ${tg.subscribedChats} suscriptos`
+                            : (tg.tokenConfigured ? 'Token configurado pero bot inactivo' : 'Sin TELEGRAM_BOT_TOKEN configurado'),
+    lastChecked: data.fetchedAt,
+  });
+
+  const el = document.getElementById('status-sources');
+  if (!el) return;
+
+  el.innerHTML = sources.map(s => `
+    <div class="card p-4 flex items-start gap-3">
+      <span class="mt-1 w-3 h-3 rounded-full flex-shrink-0 ${s.isLive ? 'bg-green-500' : 'bg-red-500'}"></span>
+      <div class="min-w-0">
+        <p class="font-semibold text-white text-sm">${s.label}</p>
+        <p class="text-xs ${s.isLive ? 'text-green-400' : 'text-red-400'} mt-0.5">${s.isLive ? 'En vivo' : 'Mock'}</p>
+        ${s.detail ? `<p class="text-xs text-slate-400 mt-1">${s.detail}</p>` : ''}
+        <p class="text-xs text-slate-500 mt-1">Verificado: ${new Date(s.lastChecked).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
+      </div>
+    </div>
+  `).join('');
 }

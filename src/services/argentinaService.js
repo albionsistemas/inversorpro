@@ -12,6 +12,7 @@
  */
 
 import axios from 'axios';
+import { reportStatus } from './statusTracker.js';
 
 const DOLAR_API_URL = 'https://dolarapi.com/v1/dolares';
 const MERVAL_IDX_URL = 'https://dolarapi.com/v1/indices/merval'; // índice general
@@ -40,10 +41,12 @@ export async function getDollarRates() {
     }));
 
     cache.dollars = { data: rates, timestamp: Date.now() };
+    reportStatus('dolarapi', 'dolarapi.com', true);
     return rates;
 
   } catch (error) {
     console.warn('[ArgentinaService] Error al obtener cotizaciones dólar, usando mock:', error.message);
+    reportStatus('dolarapi', 'dolarapi.com', false, error.message);
     return getMockDollarRates();
   }
 }
@@ -74,6 +77,7 @@ export async function getMervalData() {
   };
 
   cache.mervalStocks = { data, timestamp: Date.now() };
+  reportStatus('merval', 'Merval/CEDEARs', false, 'Mock permanente — requiere broker con auth (InvertirOnline/Rava)');
   return data;
 }
 

@@ -9,6 +9,7 @@ import {
   getSentiment,
   runBacktest,
   getTelegramStatus,
+  getStatus,
 } from '../controllers/toolsController.js';
 
 const router = Router();
@@ -25,5 +26,8 @@ router.post('/backtest', runBacktest);
 
 // GET /api/tools/telegram          — estado del bot de Telegram
 router.get('/telegram', getTelegramStatus);
+
+// GET /api/tools/status            — estado (real/mock) de cada fuente de datos
+router.get('/status', getStatus);
 
 export default router;

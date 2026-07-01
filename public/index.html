@@ -73,6 +73,7 @@
           <button onclick="switchTab('sentiment')"  id="tab-sentiment"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Sentimiento</button>
           <button onclick="switchTab('backtest')"   id="tab-backtest"   class="tab-btn px-4 py-2 transition-colors tab-inactive">Backtest</button>
           <button onclick="switchTab('portfolio')"  id="tab-portfolio"  class="tab-btn px-4 py-2 transition-colors tab-inactive">Portfolio</button>
+          <button onclick="switchTab('status')"     id="tab-status"     class="tab-btn px-4 py-2 transition-colors tab-inactive">Estado</button>
         </div>
 
         <!-- Botón actualizar + logout -->
@@ -111,6 +112,7 @@
         <button onclick="switchTab('sentiment')"  id="mob-tab-sentiment"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Sentimiento</button>
         <button onclick="switchTab('backtest')"   id="mob-tab-backtest"   class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Backtest</button>
         <button onclick="switchTab('portfolio')"  id="mob-tab-portfolio"  class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Portfolio</button>
+        <button onclick="switchTab('status')"     id="mob-tab-status"     class="mob-tab-btn whitespace-nowrap px-3 py-1.5 rounded-full text-slate-400">Estado</button>
       </div>
     </div>
   </nav>
@@ -614,6 +616,27 @@
         <div class="text-4xl mb-3">📊</div>
         <p class="font-medium">Configurá los parámetros y presioná <strong>Simular</strong></p>
         <p class="text-xs mt-1">El motor correrá la estrategia SMA sobre datos históricos sintéticos</p>
+      </div>
+    </div>
+
+    <!-- ════════ TAB: ESTADO ════════ -->
+    <div id="panel-status" class="tab-panel hidden space-y-6 animate-fade-in">
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="font-semibold text-white">Estado de las Fuentes de Datos</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Verde = datos reales en este momento · Rojo = usando datos mock</p>
+          </div>
+          <button onclick="statusLoaded = false; loadStatus();" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-semibold transition-colors">↻ Refrescar</button>
+        </div>
+        <div id="status-sources" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+          <div class="skeleton h-20 rounded-lg"></div>
+        </div>
       </div>
     </div>
 

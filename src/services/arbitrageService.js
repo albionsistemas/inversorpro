@@ -16,6 +16,7 @@
  */
 
 import axios from 'axios';
+import { reportStatus } from './statusTracker.js';
 
 const CRIPTOYA_BASE  = 'https://criptoya.com/api';
 const CACHE_TTL_MS   = 2 * 60 * 1000;
@@ -68,10 +69,12 @@ export async function getCryptoArbitrageOpportunities() {
       .sort((a, b) => b.netProfitPct - a.netProfitPct);
 
     cache.crypto = { data: oportunidades, timestamp: Date.now() };
+    reportStatus('criptoya', 'Criptoya', true);
     return oportunidades;
 
   } catch (error) {
     console.warn('[ArbitrageService] Fallback a mock cripto:', error.message);
+    reportStatus('criptoya', 'Criptoya', false, error.message);
     return getMockCryptoArbitrage();
   }
 }
@@ -132,10 +135,12 @@ export async function getMepArbitrageOpportunities() {
       .sort((a, b) => b.netProfitPct - a.netProfitPct);
 
     cache.mep = { data: oportunidades, timestamp: Date.now() };
+    reportStatus('criptoya', 'Criptoya', true);
     return oportunidades;
 
   } catch (error) {
     console.warn('[ArbitrageService] Fallback a mock MEP:', error.message);
+    reportStatus('criptoya', 'Criptoya', false, error.message);
     return getMockMepArbitrage();
   }
 }
