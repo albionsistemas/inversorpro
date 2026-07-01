@@ -1,14 +1,15 @@
 /**
  * whaleTrackerService.js — Seguimiento de inversores institucionales y ballenas cripto
  *
- * Fuentes de datos (arquitectura lista para conectar):
+ * Fuentes de datos:
+ *   - Whale Alert API: transacciones cripto grandes en tiempo real (última hora)
+ *     https://docs.whale-alert.io — requiere WHALE_ALERT_API_KEY en .env, si no
+ *     está configurada cae a datos mock.
  *   - SEC EDGAR API: 13F filings (declaraciones trimestrales de fondos >$100M)
- *     https://efts.sec.gov/LATEST/search-index?forms=13F-HR
- *   - Whale Alert API: transacciones cripto grandes en tiempo real
- *     https://docs.whale-alert.io
- *   - Datos mock educativos basados en posiciones públicas reales
+ *     https://efts.sec.gov/LATEST/search-index?forms=13F-HR — todavía no
+ *     conectado (requiere parsear XML/XBRL de los filings), datos mock permanente.
  *
- * Superinversores rastreados:
+ * Superinversores rastreados (mock, basado en 13F públicos reales):
  *   - Warren Buffett (Berkshire Hathaway)
  *   - Ray Dalio (Bridgewater Associates)
  *   - Cathie Wood (ARK Invest)
@@ -16,9 +17,11 @@
  *   - Stanley Druckenmiller
  */
 
+import axios from 'axios';
 import { reportStatus } from './statusTracker.js';
 
 const CACHE_TTL_MS = (parseInt(process.env.CACHE_TTL_MINUTES) || 5) * 60 * 1000;
+const WHALE_ALERT_MIN_VALUE = parseInt(process.env.WHALE_ALERT_MIN_VALUE) || 500000;
 let cache = { activities: null };
 
 /**
@@ -30,18 +33,17 @@ export async function getWhaleActivities() {
     return cache.activities.data;
   }
 
-  // En producción: fetch a SEC EDGAR + Whale Alert APIs
-  // Por ahora: datos mock con posiciones públicas conocidas
+  reportStatus('whales_institutional', 'Whale Tracker (Institucional)', false,
+    'Mock permanente — requiere parser de SEC EDGAR 13F (declaraciones trimestrales)');
+
   const data = {
     institutional: getInstitutionalMoves(),
-    cryptoWhales:  getCryptoWhaleMoves(),
+    cryptoWhales:  await getCryptoWhaleMoves(),
     sentiment:     calculateOverallSentiment(),
     lastUpdated:   new Date().toISOString(),
-    dataSource:    'demo', // cambiar a 'live' cuando se conecten APIs reales
   };
 
   cache.activities = { data, timestamp: Date.now() };
-  reportStatus('whales', 'Whale Tracker', false, 'Mock permanente — requiere SEC EDGAR / Whale Alert API');
   return data;
 }
 
@@ -151,7 +153,76 @@ function getInstitutionalMoves() {
   ];
 }
 
-function getCryptoWhaleMoves() {
+/**
+ * Obtiene transacciones cripto grandes de la última hora vía Whale Alert.
+ * Sin WHALE_ALERT_API_KEY configurada (o si la API falla), cae a datos mock.
+ */
+async function getCryptoWhaleMoves() {
+  const apiKey = process.env.WHALE_ALERT_API_KEY;
+  if (!apiKey) {
+    reportStatus('whales_crypto', 'Whale Tracker (Cripto)', false,
+      'Sin WHALE_ALERT_API_KEY configurada — obtenela en whale-alert.io');
+    return getMockCryptoWhaleMoves();
+  }
+
+  try {
+    const start = Math.floor(Date.now() / 1000) - 3600; // última hora
+    const r = await axios.get('https://api.whale-alert.io/v1/transactions', {
+      params:  { api_key: apiKey, min_value: WHALE_ALERT_MIN_VALUE, start, limit: 100 },
+      timeout: 8000,
+    });
+
+    const moves = (r.data?.transactions ?? [])
+      .map(mapWhaleAlertTransaction)
+      .filter(Boolean)
+      .sort((a, b) => b.amountUsd - a.amountUsd)
+      .slice(0, 8);
+
+    reportStatus('whales_crypto', 'Whale Tracker (Cripto)', true, 'Whale Alert API');
+    return moves;
+  } catch (e) {
+    console.warn('[WhaleTrackerService] Whale Alert:', e.message);
+    reportStatus('whales_crypto', 'Whale Tracker (Cripto)', false, e.message);
+    return getMockCryptoWhaleMoves();
+  }
+}
+
+/**
+ * Traduce una transacción de Whale Alert a un movimiento con señal BUY/SELL.
+ * Retiro desde exchange → acumulación (BUY). Depósito a exchange → posible venta (SELL).
+ * Movimientos exchange-a-exchange o wallet-a-wallet no traen señal clara y se descartan.
+ */
+function mapWhaleAlertTransaction(tx) {
+  const fromExchange = tx.from?.owner_type === 'exchange';
+  const toExchange    = tx.to?.owner_type === 'exchange';
+  const symbol        = (tx.symbol || '').toUpperCase();
+  const amount        = Math.round(tx.amount).toLocaleString('en-US');
+
+  let action, walletTag, detail;
+  if (fromExchange && !toExchange) {
+    action    = 'BUY';
+    walletTag = tx.to?.address ?? '';
+    detail    = `${amount} ${symbol} retirados de ${tx.from.owner || 'exchange'} a billetera fría (señal de acumulación)`;
+  } else if (toExchange && !fromExchange) {
+    action    = 'SELL';
+    walletTag = tx.from?.address ?? '';
+    detail    = `${amount} ${symbol} depositados en ${tx.to.owner || 'exchange'} (señal de posible venta)`;
+  } else {
+    return null;
+  }
+
+  return {
+    investor:  `Ballena ${symbol}`,
+    asset:     symbol,
+    action,
+    amountUsd: tx.amount_usd,
+    walletTag,
+    detail,
+    type:      'crypto',
+  };
+}
+
+function getMockCryptoWhaleMoves() {
   return [
     {
       investor:  'Wallet Ballena #1 (Bitcoin)',
